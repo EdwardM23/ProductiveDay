@@ -1,22 +1,27 @@
 package com.edward.productiveday.services
 
+import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import com.edward.productiveday.AppLockPreference
 import com.edward.productiveday.ServiceRestart
 import com.edward.productiveday.views.RotatePhoneView
+import java.util.Date
 import java.util.SortedMap
 import java.util.Timer
 import java.util.TimerTask
 import java.util.TreeMap
-
 
 class AppCheckService: Service() {
 
@@ -30,32 +35,53 @@ class AppCheckService: Service() {
     private var counter = 0
     private var currentApp = ""
     private var previousApp = ""
+    private lateinit var createdTime: Date
+    private lateinit var notification: Notification
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        timer = Timer("AppCheckService")
-        try {
-            timer.schedule(updateTask, 0, 1000L)
-        } catch (e: Exception){
-            Log.d(TAG, "catch timer.schedule()")
-        }
+        Log.d(TAG, "OnStartCommand Called")
+
         return START_STICKY
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun createNotification() {
+        var CHANNEL_ID = "MyServiceChannel"
+        val notificationChannel = NotificationChannel(CHANNEL_ID, "Channel Name", NotificationManager.IMPORTANCE_DEFAULT)
+        notificationChannel.description = "Producktive app, foreground service"
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(notificationChannel)
+
+        notification = NotificationCompat.Builder(context, CHANNEL_ID).setContentTitle("Producktive").setContentText("Text...").build()
+        startForeground(1, notification)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
+        appLockPreference = AppLockPreference()
         context = applicationContext
         rotatePhoneView = RotatePhoneView(context)
-        appLockPreference = AppLockPreference()
         lockedAppList = appLockPreference.getLockedAppList(context)!!
+        createdTime = Date()
+
+        timer = Timer("AppCheckService")
+        createNotification()
+        try {
+            timer.schedule(updateTask, 0, 1000L)
+            appLockPreference.saveServiceEnabled(context, true)
+        } catch (e: Exception){
+            Log.d(TAG, "catch timer.schedule()")
+        }
     }
 
     private val updateTask: TimerTask = object : TimerTask() {
         override fun run() {
-            Log.d(TAG, "Timer is running " + counter++)
+            Log.d(TAG, "Timer $createdTime is running " + counter++)
             lockedAppList = appLockPreference.getLockedAppList(context)!!
 
             if(checkOpenedApp() && rotatePhoneView.windowToken == null && currentApp != ""){
@@ -76,19 +102,6 @@ class AppCheckService: Service() {
 
     private fun hideUnlockScreenOverlay(){
         rotatePhoneView.closeOverlay()
-    }
-
-    //    private fun startTimer(){
-//        timer = Timer("AppCheckService")
-//        timer.schedule(updateTask, 0, 1000L)
-//    }
-//    override fun onTaskRemoved(rootIntent: Intent?) {
-//        super.onTaskRemoved(rootIntent)
-//        Log.d(TAG, "OnTaskRemoved")
-//    }
-
-    private fun stopTimer(){
-        timer.cancel()
     }
 
     private fun checkOpenedApp(): Boolean {
@@ -122,9 +135,18 @@ class AppCheckService: Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d(TAG, "Service OnTaskRemoved")
-        val broadcastIntent = Intent(this, ServiceRestart::class.java)
-        sendBroadcast(broadcastIntent)
-        super.onTaskRemoved(rootIntent)
+        val restartServiceIntent = Intent(context, ServiceRestart::class.java)
+        sendBroadcast(restartServiceIntent)
+
+//        super.onTaskRemoved(rootIntent)
+    }
+
+    private fun stopTimer(){
+        appLockPreference.saveServiceEnabled(context, false)
+        timer.cancel()
+        stopForeground(STOP_FOREGROUND_DETACH)
+        stopSelf()
+        Log.d(TAG, "Stopping Service")
     }
 
     override fun onDestroy() {
