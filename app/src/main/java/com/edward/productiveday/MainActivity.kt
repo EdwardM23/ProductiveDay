@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var dbHelper: DatabaseHelper
     private lateinit var serviceIntent: Intent
+    private lateinit var appLockPreference: AppLockPreference
 
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,8 +44,9 @@ class MainActivity : AppCompatActivity() {
 
 //        checkUsageStatsPermission(this)
 //        checkOverlayPermission(this)
-//        startService()
 //        refreshAppDatabase();
+        serviceIntent = Intent(this, AppCheckService::class.java)
+        appLockPreference = AppLockPreference()
 
         binding.btnAppList.setOnClickListener {
             val appListIntent = Intent(this, AppListActivity::class.java)
@@ -58,6 +60,8 @@ class MainActivity : AppCompatActivity() {
         binding.btnStop.setOnClickListener {
             stopService()
         }
+
+        binding.textView.text = isServiceRunning().toString()
     }
 
     private fun refreshAppDatabase() {
@@ -78,16 +82,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startService(){
-        serviceIntent = Intent(this, AppCheckService::class.java)
-        startService(serviceIntent)
-        binding.textView.text = isServiceRunning(AppCheckService::class.java).toString()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else{
+            startService(serviceIntent)
+        }
+        binding.textView.text = isServiceRunning().toString()
     }
 
     private fun stopService(){
-        if (isServiceRunning(AppCheckService::class.java)){
-            stopService(serviceIntent)
-        }
-        binding.textView.text = isServiceRunning(AppCheckService::class.java).toString()
+        this.stopService(serviceIntent)
+        binding.textView.text = isServiceRunning().toString()
     }
 
     fun checkUsageStatsPermission(context: Context) {
@@ -112,16 +117,18 @@ class MainActivity : AppCompatActivity() {
         context.startActivity(intent)
     }
 
-    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
-        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
-            if (serviceClass.getName() == service.service.className) {
-                Log.d("isMyServiceRunning?", true.toString() + "")
-                return true
-            }
-        }
-        Log.d("isMyServiceRunning?", false.toString() + "")
-        return false
+    private fun isServiceRunning(): Boolean {
+//        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+//        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+//            if (serviceClass.getName() == service.service.className) {
+//                Log.d("isMyServiceRunning?", true.toString() + "")
+//                return true
+//            }
+//        }
+//        Log.d("isMyServiceRunning?", false.toString() + "")
+//        return false
+
+        return appLockPreference.isServiceEnabled(this)
     }
 
     fun checkOverlayPermission(context: Context) {
@@ -133,8 +140,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
 //        val broadcastIntent = Intent(this, ServiceRestart::class.java)
 //        sendBroadcast(broadcastIntent)
-        stopService(serviceIntent)
-        Log.d("MainActivity", "Activity OnDestroy")
+//        Log.d("MainActivity", "Activity OnDestroy")
         super.onDestroy()
     }
 }
