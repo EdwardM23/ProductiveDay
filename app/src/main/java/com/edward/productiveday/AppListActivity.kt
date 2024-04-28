@@ -1,15 +1,14 @@
 package com.edward.productiveday
 
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.widget.ArrayAdapter
+import android.widget.SearchView
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,8 +19,10 @@ import com.edward.productiveday.models.AppModel
 
 class AppListActivity : AppCompatActivity() {
 
+    private var applicationList = ArrayList<AppModel>()
     private lateinit var binding: ActivityAppListBinding
     private lateinit var dbHelper: DatabaseHelper
+    private lateinit var adapter: AppListAdapter
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,28 +37,39 @@ class AppListActivity : AppCompatActivity() {
             insets
         }
 
-        val recyclerView = binding.rvAppList
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        val adapter = AppListAdapter(getInstalledApps(), this)
-        recyclerView.adapter = adapter
+        getInstalledApps()
+
+        binding.searchView.setOnQueryTextListener(object: SearchView.OnQueryTextListener{
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filter(newText.toString())
+                return false
+            }
+        })
+    }
+
+    private fun filter(query: String){
+        var filteredList = ArrayList<AppModel>()
+        for(app in applicationList){
+            if(app.name.contains(query, true)){
+                filteredList.add(app)
+            }
+        }
+        adapter.filterList(filteredList)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun getInstalledApps(): List<AppModel>{
+    private fun getInstalledApps() {
         dbHelper = DatabaseHelper(this)
-//        val packageManager: PackageManager = this.packageManager
-//        val appList: List<ApplicationInfo> = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-//        for(app in appList){
-//            if(packageManager.getLaunchIntentForPackage(app.packageName) != null){
-//                val appName = app.loadLabel(packageManager).toString()
-//                val appIcon = app.loadIcon(packageManager)
-//                val appPackageName = app.packageName
-//                Log.d("Test", appPackageName)
-//                val appModel = AppModel(appIcon, appName, appPackageName);
-//                filteredAppList.add(appModel)
-//            }
-//        }
+        for(app in dbHelper.getAll()){
+            applicationList.add(app)
+        }
 
-        return dbHelper.getAll()
+        adapter = AppListAdapter(applicationList, this)
+        binding.rvAppList.layoutManager = LinearLayoutManager(this)
+        binding.rvAppList.adapter = adapter
     }
 }

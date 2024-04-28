@@ -18,7 +18,7 @@ import com.edward.productiveday.databinding.AdapterAppListBinding
 import com.edward.productiveday.models.AppModel
 import com.edward.productiveday.utils.DisplayToast
 
-class AppListAdapter(private val appList: List<AppModel>, context: Context):
+class AppListAdapter(private var appList: ArrayList<AppModel>, context: Context):
     RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
         private lateinit var binding: AdapterAppListBinding
         private val context = context
@@ -64,6 +64,11 @@ class AppListAdapter(private val appList: List<AppModel>, context: Context):
             }
         }
         return false
+    }
+
+    public fun filterList(filteredList: ArrayList<AppModel>){
+        appList = filteredList
+        notifyDataSetChanged()
     }
 
     class ViewHolder(ItemView: View): RecyclerView.ViewHolder(ItemView) {
